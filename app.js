@@ -106,6 +106,7 @@ const save = async () => {
   try {
     const storage = await openStorage();
     storage.transaction('data', 'readwrite').objectStore('data').put(db, KEY);
+    window.Nube?.notify();
   } catch { setMessage('No se pudieron guardar los cambios en este navegador.', true); }
 };
 const uid = () => crypto.randomUUID();
@@ -1946,10 +1947,32 @@ function renderActaTeam() {
 
 // Un solo clic: genera UN PDF con el acta de TODOS los ambientes del Área (facultad) seleccionada,
 // una hoja por ambiente. Solo se piden los inventariadores; lo demás queda en blanco para llenarlo a mano.
+// - Los ambientes "FALTANTES ..." son bolsas de bienes no ubicados, no ambientes reales: NO llevan acta.
+// - Todas las aulas del área (nombres que empiezan con "AULA"/"AULAS") van JUNTAS en una sola acta.
+const ACTA_GRUPO_AULAS_ID = '__grupo_aulas__';
+const actaEsFaltante = (room) => /falt/i.test(String(room?.name || ''));
+const actaEsAula = (room) => /^\s*aulas?\b/i.test(String(room?.name || ''));
 function actaRoomsOfSelectedArea() {
   const area = selectedArea();
   if (!area) return [];
-  return db.rooms.filter((r) => r.areaId === area.id).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
+  const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'es');
+  const rooms = db.rooms.filter((r) => r.areaId === area.id && !actaEsFaltante(r));
+  const aulas = rooms.filter(actaEsAula);
+  const otros = rooms.filter((r) => !actaEsAula(r)).sort(byName);
+  const result = otros.map((r) => ({ id: r.id, name: r.name }));
+  if (aulas.length) {
+    // Nombre del acta: "AULAS 301, 302, 303" (se quita la palabra AULA de cada nombre y se juntan los números).
+    const nums = aulas.slice().sort(byName)
+      .map((r) => String(r.name || '').replace(/^\s*aulas?\s*[-:]?\s*/i, '').trim())
+      .filter(Boolean);
+    const nombre = aulas.length === 1 ? (aulas[0].name || 'AULA') : (nums.length ? `AULAS ${nums.join(', ')}` : 'AULAS');
+    result.unshift({
+      id: ACTA_GRUPO_AULAS_ID,
+      name: nombre,
+      label: aulas.length === 1 ? nombre : `${nombre}  (${aulas.length} aulas en una sola acta)`
+    });
+  }
+  return result;
 }
 
 function openActaDialog() {
@@ -1966,7 +1989,7 @@ function openActaDialog() {
     const box = document.createElement('input');
     box.type = 'checkbox'; box.checked = true; box.value = room.id;
     const span = document.createElement('span');
-    span.textContent = room.name || 'Sin nombre';
+    span.textContent = room.label || room.name || 'Sin nombre';
     label.append(box, span);
     list.append(label);
   });
@@ -2639,6 +2662,8 @@ async function initialize() {
   // Los encargados se leen del mismo inventario.xlsx ya descargado; si ya estaban resumidos
   // de una sesión anterior, loadCustodios() sale de inmediato y solo los pinta.
   loadCustodios();
-  loadProjectInventory(); restoreSourceAreas();
+  // La nube (Firebase) espera a que el catálogo esté cargado para poder ubicar cada bien por código y ambiente.
+  const catalogReady = Promise.allSettled([loadProjectInventory(), restoreSourceAreas()]);
+  window.Nube?.init({ getDb: () => db, header, uid, persist: () => save(), refresh: () => { renderSelectors(); renderAssets(); }, ready: catalogReady });
 }
 initialize();

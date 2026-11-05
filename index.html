@@ -454,7 +454,15 @@
     <script>if(!(window.jspdf))document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>');</script>
     <script src="libs/jspdf.plugin.autotable.min.js"></script>
     <script>if(!(window.jspdf&&window.jspdf.jsPDF.API.autoTable))document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"><\/script>');</script>
+    <script src="firebase-config.js"></script>
+    <script>if(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey)document.write('<script src="libs/firebase-app-compat.js"><\/script>');</script>
+    <script>if(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey&&!(window.firebase))document.write('<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"><\/script>');</script>
+    <script>if(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey)document.write('<script src="libs/firebase-auth-compat.js"><\/script>');</script>
+    <script>if(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey&&!(window.firebase&&firebase.auth))document.write('<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"><\/script>');</script>
+    <script>if(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey)document.write('<script src="libs/firebase-firestore-compat.js"><\/script>');</script>
+    <script>if(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey&&!(window.firebase&&firebase.firestore))document.write('<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"><\/script>');</script>
+    <script src="nube.js" defer></script>
     <script src="logo-data.js?v=6" defer></script>
-    <script src="app.js?v=36" defer></script>
+    <script src="app.js?v=37" defer></script>
   </body>
 </html>
