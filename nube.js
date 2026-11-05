@@ -171,51 +171,157 @@
   }
   function stopListener() { if (unsub) { unsub(); unsub = null; } }
 
-  // ---------- interfaz (botón flotante + ventana de inicio de sesión) ----------
-  const LABEL = { nologin: '☁ Iniciar sesión', ok: '☁ Sincronizado', sync: '☁ Sincronizando…', offline: '☁ Sin conexión', error: '☁ Error de nube' };
-  const COLOR = { nologin: '#b45309', ok: '#166534', sync: '#1d4ed8', offline: '#4b5563', error: '#b91c1c' };
-  let btn, dlg;
+  // ---------- inicio de sesión (pantalla completa, con modo sin conexión) ----------
+  // Cómo funciona sin internet:
+  //  1) Si ya iniciaste sesión alguna vez en este equipo, Firebase guarda la sesión y la app entra SOLA, con o sin internet.
+  //  2) Si cerraste sesión (o es otro navegador) y NO hay internet: al iniciar sesión con internet por primera vez se guarda
+  //     una huella (hash) de tu clave en este equipo; con ella puedes entrar sin conexión. La clave nunca se guarda en claro.
+  //  3) Al volver el internet, la sesión de la nube se retoma sola y se suben los cambios pendientes.
+  const OFF_KEY = 'nube_offline_cred_v1';
+  const LABEL = { nologin: '☁ Sin sesión', ok: '☁ Sincronizado', sync: '☁ Sincronizando…', offline: '☁ Sin conexión', error: '☁ Error de nube', local: '☁ Modo local' };
+  const COLOR = { nologin: '#b45309', ok: '#166534', sync: '#1d4ed8', offline: '#4b5563', error: '#b91c1c', local: '#4b5563' };
+  let btn, dlg, gate, offlineUser = null, offlinePass = '';
+
+  const toHex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  async function hashPass(email, pass, saltHex) {
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveBits']);
+    const salt = saltHex ? Uint8Array.from(saltHex.match(/../g).map((h) => parseInt(h, 16))) : crypto.getRandomValues(new Uint8Array(16));
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 120000 }, key, 256);
+    return { salt: toHex(salt), hash: toHex(bits) };
+  }
+  const getCreds = () => { try { return JSON.parse(localStorage.getItem(OFF_KEY) || '[]'); } catch { return []; } };
+  async function rememberCred(email, pass) {
+    try {
+      const { salt, hash } = await hashPass(email, pass);
+      const list = getCreds().filter((c) => c.email !== email); list.push({ email, salt, hash });
+      localStorage.setItem(OFF_KEY, JSON.stringify(list));
+    } catch (e) { console.warn('Nube: no se pudo guardar el acceso sin conexión', e); }
+  }
+  async function checkOfflineCred(email, pass) {
+    const c = getCreds().find((x) => x.email === email); if (!c) return null;
+    const { hash } = await hashPass(email, pass, c.salt);
+    return hash === c.hash;
+  }
+
   function setState(s, info) {
-    state = s; lastInfo = info || '';
-    if (btn) { btn.textContent = LABEL[s] || '☁'; btn.style.background = COLOR[s] || '#4b5563'; btn.title = lastInfo || ''; }
+    state = offlineUser && !user ? 'local' : s; lastInfo = info || '';
+    if (btn) { btn.textContent = LABEL[state] || '☁'; btn.style.background = COLOR[state] || '#4b5563'; btn.title = lastInfo || ''; }
     if (dlg && dlg.open) renderDialog();
+  }
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function showGate(mode) { // mode: 'loading' | 'login'
+    if (!gate) return;
+    gate.hidden = false; document.body.style.overflow = 'hidden';
+    gate.querySelector('.ng-loading').hidden = mode !== 'loading';
+    gate.querySelector('.ng-form').hidden = mode !== 'login';
+    updateNet();
+  }
+  function hideGate() { if (gate) { gate.hidden = true; document.body.style.overflow = ''; } }
+  function updateNet() {
+    if (!gate) return;
+    const on = navigator.onLine, el = gate.querySelector('.ng-net');
+    el.className = 'ng-net ' + (on ? 'on' : 'off');
+    el.textContent = on ? '● Con conexión' : '● Sin conexión';
+    gate.querySelector('.ng-hint').textContent = on
+      ? 'Use el correo y la clave que le dio el administrador.'
+      : 'Sin internet: puede entrar con su correo y clave si ya inició sesión antes en este equipo, o continuar en modo local.';
+  }
+  async function doLogin() {
+    const mail = gate.querySelector('#ng-mail').value.trim().toLowerCase();
+    const pass = gate.querySelector('#ng-pass').value;
+    const err = gate.querySelector('.ng-err'), go = gate.querySelector('#ng-go');
+    if (!mail || !pass) { err.textContent = 'Escriba su correo y su clave.'; return; }
+    err.textContent = ''; go.disabled = true; go.textContent = 'Entrando…';
+    try {
+      if (navigator.onLine) {
+        try {
+          await auth.signInWithEmailAndPassword(mail, pass);   // onAuthStateChanged oculta la pantalla
+          rememberCred(mail, pass);
+          return;
+        } catch (ex) {
+          const c = (ex && ex.code) || '';
+          if (c !== 'auth/network-request-failed') throw ex;     // clave mala, etc.
+          // la red "parece" activa pero no hay internet real: se prueba el acceso local
+        }
+      }
+      const ok = await checkOfflineCred(mail, pass);
+      if (ok === null) err.textContent = 'Este equipo aún no tiene acceso sin conexión para ese correo. Inicie sesión una vez con internet, o use "Continuar sin conexión".';
+      else if (!ok) err.textContent = 'Correo o clave incorrectos.';
+      else { offlineUser = { email: mail }; offlinePass = pass; hideGate(); setState('offline', 'Sesión local. Se sincroniza al volver el internet'); }
+    } catch (ex) {
+      const c = (ex && ex.code) || '';
+      err.textContent = /invalid|wrong|user-not-found|credential/i.test(c) ? 'Correo o clave incorrectos.'
+        : c === 'auth/too-many-requests' ? 'Demasiados intentos. Espere unos minutos.'
+        : ((c + ' ' + ((ex && ex.message) || '')).trim());
+    } finally { go.disabled = false; go.textContent = 'Entrar'; }
   }
   function renderDialog() {
     const box = dlg.querySelector('div');
-    if (user) {
-      box.innerHTML = `<h3>Nube (Firebase)</h3><p>Sesión: <b></b></p><p>Estado: <b>${LABEL[state] || ''}</b>${lastInfo ? `<br><small></small>` : ''}</p>
-        <div class="nube-row"><button data-a="sync">Sincronizar ahora</button><button data-a="out">Cerrar sesión</button><button data-a="close">Cerrar</button></div>`;
-      box.querySelector('b').textContent = user.email || '';
-      const sm = box.querySelector('small'); if (sm) sm.textContent = lastInfo;
-    } else {
-      box.innerHTML = `<h3>Iniciar sesión en la nube</h3><p>Use el correo y la contraseña que le dio el administrador.</p>
-        <input id="nube-mail" type="email" placeholder="Correo" autocomplete="username"><input id="nube-pass" type="password" placeholder="Contraseña" autocomplete="current-password">
-        <p id="nube-err" style="color:#b91c1c;min-height:1.2em"></p><div class="nube-row"><button data-a="in">Entrar</button><button data-a="close">Cancelar</button></div>`;
-    }
+    const who = user ? user.email : (offlineUser ? offlineUser.email : '');
+    box.innerHTML = `<h3>Nube (Firebase)</h3><p>Sesión: <b></b></p><p>Estado: <b>${LABEL[state] || ''}</b>${lastInfo ? '<br><small></small>' : ''}</p>
+      <div class="nube-row"><button data-a="sync">Sincronizar ahora</button><button data-a="out">Cerrar sesión</button><button data-a="close">Cerrar</button></div>`;
+    box.querySelector('b').textContent = who || 'Sin iniciar sesión';
+    const sm = box.querySelector('small'); if (sm) sm.textContent = lastInfo;
   }
   function buildUI() {
     if (typeof document === 'undefined' || !document.body || btn) return;
     const st = document.createElement('style');
     st.textContent = `#nube-btn{position:fixed;right:14px;bottom:14px;z-index:9999;border:0;border-radius:999px;padding:9px 14px;font:600 13px system-ui,sans-serif;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer}
       #nube-dlg{border:0;border-radius:12px;padding:0;max-width:360px;width:92%}#nube-dlg::backdrop{background:rgba(0,0,0,.45)}#nube-dlg>div{padding:18px;font:14px system-ui,sans-serif}
-      #nube-dlg h3{margin:0 0 8px}#nube-dlg input{display:block;width:100%;box-sizing:border-box;margin:6px 0;padding:9px;font-size:15px}
-      .nube-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.nube-row button{padding:8px 12px;font-size:14px;cursor:pointer}`;
+      #nube-dlg h3{margin:0 0 8px}.nube-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.nube-row button{padding:8px 12px;font-size:14px;cursor:pointer}
+      #nube-gate{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px;font-family:system-ui,'Segoe UI',sans-serif;color:#eef4ff;
+        background:radial-gradient(900px 500px at 15% 10%,rgba(44,227,255,.18),transparent 60%),radial-gradient(800px 500px at 90% 95%,rgba(255,201,61,.14),transparent 60%),#03050b}
+      #nube-gate[hidden]{display:none}
+      .ng-card{width:100%;max-width:400px;padding:30px 26px;border-radius:20px;background:rgba(13,21,41,.78);backdrop-filter:blur(14px);border:1px solid rgba(120,200,255,.28);box-shadow:0 0 40px rgba(44,227,255,.14),0 20px 50px rgba(0,0,0,.5);text-align:center}
+      .ng-logo{width:92px;height:auto;margin:0 auto 12px;display:block;filter:drop-shadow(0 0 14px rgba(255,201,61,.35))}
+      .ng-card h1{margin:0;font-size:22px;letter-spacing:.3px}.ng-card h2{margin:4px 0 16px;font-size:13px;font-weight:500;color:#92a6cb}
+      .ng-net{display:inline-block;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;margin-bottom:14px}
+      .ng-net.on{background:rgba(63,242,172,.12);color:#3ff2ac}.ng-net.off{background:rgba(255,201,61,.14);color:#ffc93d}
+      .ng-hint{font-size:12.5px;color:#92a6cb;margin:0 0 14px;line-height:1.45}
+      .ng-field{position:relative;margin-bottom:12px;text-align:left}
+      .ng-field input{width:100%;box-sizing:border-box;padding:13px 44px 13px 14px;font-size:16px;color:#eef4ff;background:rgba(19,29,54,.8);border:1px solid rgba(120,190,255,.25);border-radius:12px;outline:none}
+      .ng-field input:focus{border-color:#2ce3ff;box-shadow:0 0 0 3px rgba(44,227,255,.18)}
+      .ng-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;color:#92a6cb;font-size:18px;cursor:pointer;padding:6px 8px}
+      #ng-go{width:100%;padding:13px;margin-top:4px;border:0;border-radius:12px;font-size:16px;font-weight:700;color:#03121a;background:linear-gradient(90deg,#2ce3ff,#a7f3ff);cursor:pointer}
+      #ng-go:disabled{opacity:.6;cursor:wait}
+      .ng-link{display:block;width:100%;margin-top:12px;background:none;border:1px solid rgba(255,201,61,.45);color:#ffc93d;padding:11px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer}
+      .ng-err{color:#ff4d70;font-size:13px;min-height:1.3em;margin:8px 0 0}.ng-loading{color:#92a6cb;padding:30px 0}`;
     document.head.appendChild(st);
+
     btn = document.createElement('button'); btn.id = 'nube-btn'; btn.type = 'button';
     btn.onclick = () => { renderDialog(); dlg.showModal(); };
     dlg = document.createElement('dialog'); dlg.id = 'nube-dlg'; dlg.appendChild(document.createElement('div'));
     dlg.addEventListener('click', async (e) => {
       const a = e.target && e.target.dataset && e.target.dataset.a; if (!a) return;
       if (a === 'close') dlg.close();
-      else if (a === 'out') { await auth.signOut(); dlg.close(); }
-      else if (a === 'sync') { errorUntil = 0; pushNow(); if (ctx) startListener(); }
-      else if (a === 'in') {
-        const err = dlg.querySelector('#nube-err'); err.textContent = 'Entrando…';
-        try { await auth.signInWithEmailAndPassword(dlg.querySelector('#nube-mail').value.trim(), dlg.querySelector('#nube-pass').value); dlg.close(); }
-        catch (ex) { err.textContent = /invalid|wrong|user-not-found|credential/i.test(ex.code || ex.message) ? 'Correo o contraseña incorrectos.' : ((ex.code || '') + ' ' + (ex.message || '')); }
-      }
+      else if (a === 'out') { offlineUser = null; offlinePass = ''; try { if (auth) await auth.signOut(); } catch (_) {} dlg.close(); showGate('login'); setState('nologin'); }
+      else if (a === 'sync') { errorUntil = 0; pushNow(); if (ctx && user) startListener(); }
     });
-    document.body.append(btn, dlg);
+
+    gate = document.createElement('div'); gate.id = 'nube-gate'; gate.hidden = true;
+    gate.innerHTML = `<div class="ng-card">
+      <img class="ng-logo" alt="UNCP">
+      <h1>Inventario de Bienes</h1><h2>Universidad Nacional del Centro del Perú</h2>
+      <p class="ng-loading">Verificando sesión…</p>
+      <div class="ng-form" hidden>
+        <span class="ng-net on">● Con conexión</span>
+        <p class="ng-hint"></p>
+        <div class="ng-field"><input id="ng-mail" type="email" placeholder="Correo" autocomplete="username"></div>
+        <div class="ng-field"><input id="ng-pass" type="password" placeholder="Clave" autocomplete="current-password"><button type="button" class="ng-eye" title="Mostrar/ocultar">👁</button></div>
+        <button id="ng-go" type="button">Entrar</button>
+        <p class="ng-err"></p>
+        <button class="ng-link" id="ng-local" type="button">Continuar sin conexión (solo local)</button>
+      </div></div>`;
+    gate.querySelector('.ng-logo').src = window.LOGO_DATA_URI || 'logo-uncp.png';
+    gate.querySelector('#ng-go').onclick = doLogin;
+    gate.querySelector('#ng-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+    gate.querySelector('#ng-mail').addEventListener('keydown', (e) => { if (e.key === 'Enter') gate.querySelector('#ng-pass').focus(); });
+    gate.querySelector('.ng-eye').onclick = () => { const i = gate.querySelector('#ng-pass'); i.type = i.type === 'password' ? 'text' : 'password'; };
+    gate.querySelector('#ng-local').onclick = () => { offlineUser = { email: '' }; hideGate(); setState('offline', 'Modo local: los cambios quedan en este equipo. Inicie sesión luego para subirlos.'); };
+    document.body.append(btn, dlg, gate);
+    showGate('loading');
     setState(state, lastInfo);
   }
 
@@ -224,13 +330,24 @@
     ctx = options; window.Nube.enabled = true;
     firebase.initializeApp(cfg);
     fdb = firebase.firestore(); auth = firebase.auth();
+    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
     fdb.enablePersistence({ synchronizeTabs: true }).catch((e) => console.warn('Nube: sin caché sin conexión', e && e.code));
     buildUI();
-    window.addEventListener('online', () => { errorUntil = 0; notify(); });
-    window.addEventListener('offline', () => setState('offline', 'Los cambios se enviarán al volver la conexión'));
+    window.addEventListener('online', () => {
+      updateNet(); errorUntil = 0;
+      // si se entró sin conexión con correo y clave, al volver el internet se retoma la sesión de la nube
+      if (!user && offlineUser && offlineUser.email && offlinePass) {
+        auth.signInWithEmailAndPassword(offlineUser.email, offlinePass).then(() => { offlinePass = ''; }).catch((e) => console.warn('Nube: no se pudo reconectar', e && e.code));
+      } else notify();
+    });
+    window.addEventListener('offline', () => { updateNet(); setState('offline', 'Los cambios se enviarán al volver la conexión'); });
+    // Seguro: si Firebase tarda en responder (sin internet), no dejar al usuario atascado en "Verificando…"
+    const wait = setTimeout(() => { if (!user && gate && !gate.hidden && gate.querySelector('.ng-form').hidden) showGate('login'); }, 2500);
     auth.onAuthStateChanged((u) => {
+      clearTimeout(wait);
       user = u;
-      if (!u) { stopListener(); setState('nologin'); return; }
+      if (!u) { stopListener(); if (!offlineUser) { showGate('login'); setState('nologin'); } return; }
+      offlineUser = null; hideGate();
       setState('sync', 'Preparando…');
       Promise.resolve(ctx.ready).then(() => { startListener(); pushNow(); });
     });
