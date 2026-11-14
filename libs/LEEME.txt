@@ -1,0 +1,4 @@
+Aqui van las librerias locales (se descargan con descargar-libs.bat).
+Si esta carpeta esta vacia, la app las pide a internet y NO funcionara sin conexion.
+
+libs/tesseract/ = motor de lectura inteligente (OCR) para leer el numero de 12 digitos sin internet (tambien lo baja descargar-libs).

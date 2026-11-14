@@ -3,24 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0b5cab" />
+    <meta name="theme-color" content="#0f4a24" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <title>Inventario - Trabajador</title>
+    <title>Inventario de bienes · UNCP</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=28" />
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/styles.css?v=30" />
+    <link rel="stylesheet" href="css/nube.css?v=7" />
+    <link rel="stylesheet" href="css/tema-uncp.css?v=4" />
   </head>
   <body>
     <main class="app-shell">
       <header class="topbar">
         <div class="brand">
-          <img class="brand-logo" src="logo-uncp.png" alt="Logo Universidad Nacional del Centro del Perú" />
+          <img class="brand-logo" src="assets/logo-uncp.png" alt="Logo Universidad Nacional del Centro del Perú" />
           <div>
-            <p class="eyebrow">Módulo de trabajador</p>
-            <h1>Inventario de bienes</h1>
+            <p class="eyebrow">Universidad Nacional del Centro del Perú</p>
+            <h1>Inventario de bienes patrimoniales</h1>
           </div>
         </div>
         <span class="online"><span class="status-dot"></span>Listo para registrar</span>
@@ -136,10 +138,19 @@
             <h2 id="scan-title">Escanee o digite el código</h2>
           </div>
           <div class="scan-card-actions">
+            <button id="sound-button" class="button button-secondary" type="button" title="Activar o silenciar los sonidos de confirmación">🔊 Sonido</button>
             <button id="camera-button" class="button button-primary" type="button">Abrir cámara</button>
             <button id="close-scan-button" class="button button-secondary" type="button" hidden>Cerrar consulta</button>
           </div>
         </div>
+        <div id="mode-banner" class="mode-banner mode-registro" role="status" aria-live="polite">
+          <span id="mode-banner-text">● REGISTRANDO — cada código que escanee se agrega al inventario</span>
+          <button id="mode-back-button" class="button button-primary" type="button" hidden>↩ Volver a registrar</button>
+        </div>
+        <label id="auto-return-label" class="auto-return" hidden>
+          <input id="auto-return-checkbox" type="checkbox" checked />
+          <span>Volver a registrar solo después de cada consulta o búsqueda</span>
+        </label>
         <form id="code-form" class="code-form">
           <div class="code-input-wrap">
             <input id="code-input" autocomplete="off" inputmode="numeric" placeholder="Código patrimonial" aria-label="Código patrimonial" />
@@ -147,6 +158,12 @@
           <button id="code-submit-button" class="button button-primary" type="submit">Buscar y registrar</button>
         </form>
         <div id="reader" class="reader" hidden></div>
+        <div id="reader-tools" class="reader-tools" hidden>
+          <span id="reader-status" class="reader-status" aria-live="polite"></span>
+          <button id="ocr-button" class="button reader-btn" type="button">🤖 Leer número</button>
+          <button id="torch-button" class="button reader-btn" type="button" hidden>🔦 Linterna</button>
+          <input id="zoom-range" class="reader-zoom" type="range" aria-label="Zoom" hidden />
+        </div>
         <div id="scan-result" class="scan-result" hidden>
           <p id="scan-result-title" class="scan-result-title"></p>
           <p id="scan-result-location" class="scan-result-location"></p>
@@ -433,10 +450,18 @@
         <p class="dialog-hint">Se guardan en este navegador: la próxima vez ya salen con estos nombres.</p>
         <button id="acta-add-member" class="button button-secondary" type="button">+ Añadir inventariador</button>
 
-        <details class="acta-details">
-          <summary>Ambientes incluidos</summary>
-          <div id="acta-rooms" class="acta-rooms"></div>
-        </details>
+        <h3 class="missing-subtitle">Ambientes que llevarán acta</h3>
+        <div class="acta-picker">
+          <div class="acta-quick">
+            <button id="acta-select-all" class="button button-secondary" type="button">✔ Todo el área</button>
+            <button id="acta-select-none" class="button button-secondary" type="button">Ninguno</button>
+          </div>
+          <div class="acta-nums">
+            <input id="acta-nums-input" type="text" inputmode="numeric" autocomplete="off" placeholder="Por número: 1, 2, 10 o 3-5" aria-label="Elegir ambientes por número" />
+            <button id="acta-select-nums" class="button button-secondary" type="button">Elegir</button>
+          </div>
+        </div>
+        <div id="acta-rooms" class="acta-rooms"></div>
         <p id="acta-count" class="search-summary"></p>
 
         <menu>
@@ -461,8 +486,9 @@
     <script>if(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey&&!(window.firebase&&firebase.auth))document.write('<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"><\/script>');</script>
     <script>if(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey)document.write('<script src="libs/firebase-firestore-compat.js"><\/script>');</script>
     <script>if(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey&&!(window.firebase&&firebase.firestore))document.write('<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"><\/script>');</script>
-    <script src="nube.js" defer></script>
-    <script src="logo-data.js?v=6" defer></script>
-    <script src="app.js?v=37" defer></script>
+    <script type="module" src="js/nube/index.js?v=11"></script>
+    <script src="assets/logo-data.js?v=6" defer></script>
+    <script src="js/escaner.js?v=4" defer></script>
+    <script src="js/app.js?v=50" defer></script>
   </body>
 </html>

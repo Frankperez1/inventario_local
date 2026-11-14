@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signed() { return request.auth != null; }
+    function correo() { return request.auth.token.email.lower(); }
+    function docUsuario() { return /databases/$(database)/documents/usuarios/$(request.auth.uid); }
+    function docAsignacion() { return /databases/$(database)/documents/asignaciones/$(correo()); }
+
+    // Administrador = correo listado aquí, o usuario con rol "admin" en la colección usuarios.
+    // IMPORTANTE: si agrega administradores en firebase-config.js (window.FIREBASE_ADMINS),
+    // agregue los MISMOS correos (en minúsculas) en esta lista; si no, la app los muestra como
+    // administradores pero Firestore les rechaza las escrituras.
+    function esAdminCorreo() { return correo() in ['admin@gmail.com']; }
+    function esAdmin() {
+      return signed() && (
+        esAdminCorreo() ||
+        (exists(docUsuario()) && get(docUsuario()).data.get('rol', '') == 'admin')
+      );
+    }
+
+    // Grupos del usuario: los de su perfil (usuarios/{uid}) o, si aún no tiene perfil, los que el
+    // administrador le asignó por correo (asignaciones/{correo}).
+    function misGrupos() {
+      return exists(docUsuario()) ? get(docUsuario()).data.get('grupos', [])
+        : (exists(docAsignacion()) ? get(docAsignacion()).data.get('grupos', []) : []);
+    }
+    // El usuario existe para la app: el administrador lo creó (usuarios/{uid}) o le asignó grupos por correo.
+    function tieneAcceso() { return exists(docUsuario()) || exists(docAsignacion()); }
+    function puedeEscribir() { return signed() && (esAdmin() || (tieneAcceso() && activo())); }
+    function activo() {
+      return exists(docUsuario()) ? get(docUsuario()).data.get('activo', true) != false
+        : (exists(docAsignacion()) ? get(docAsignacion()).data.get('activo', true) != false : true);
+    }
+
+    // Bienes registrados: cada usuario tiene su PROPIO inventario. Cada documento lleva el uid de su dueño
+    // y solo el dueño lo lee y lo escribe; nadie ve ni modifica lo de los demás.
+    // El administrador puede leer todo (para el avance global) y borrar, pero no escribe en el inventario ajeno.
+    // Lo único compartido entre usuarios son los avisos (colección avisos, más abajo).
+    match /inventario/{id} {
+      allow read: if signed() && (esAdmin() || resource.data.get('uid', '') == request.auth.uid);
+      allow create: if puedeEscribir() && request.resource.data.get('uid', '') == request.auth.uid;
+      allow update: if puedeEscribir() && resource.data.get('uid', '') == request.auth.uid
+                       && request.resource.data.get('uid', '') == request.auth.uid;
+      allow delete: if esAdmin();
+    }
+
+    match /usuarios/{uid} {
+      allow read: if signed() && (request.auth.uid == uid || esAdmin());
+      allow write: if esAdmin();
+    }
+
+    // Correo -> grupos asignados por el administrador (para cuentas ya creadas en Authentication).
+    match /asignaciones/{mail} {
+      allow read: if signed() && (esAdmin() || correo() == mail);
+      allow write: if esAdmin();
+    }
+
+    // Clave actual de cada usuario (documento = su correo en minúsculas). La ESCRIBE el propio usuario (al iniciar sesión o cambiarla)
+    // o el administrador, y SOLO la LEE el administrador: permite cambiar claves de cuentas con correo de prueba sin servidor.
+    match /claves_admin/{mail} {
+      allow read: if esAdmin();
+      allow create, update: if signed() && (esAdmin() || correo() == mail);
+      allow delete: if esAdmin();
+    }
+
+    // Avisos: se crean cuando alguien registra un bien en un ambiente que no le corresponde. Los lee el grupo dueño del
+    // bien (y el administrador). Cada aviso solo lo puede crear o modificar quien lo generó.
+    match /avisos/{id} {
+      allow read: if signed() && (esAdmin() || resource.data.get('grupo', '') in misGrupos());
+      allow create: if puedeEscribir() && request.resource.data.get('uid', '') == request.auth.uid;
+      allow update: if puedeEscribir() && resource.data.get('uid', '') == request.auth.uid
+                       && request.resource.data.get('uid', '') == request.auth.uid;
+      allow delete: if esAdmin();
+    }
+  }
+}
