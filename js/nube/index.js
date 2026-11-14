@@ -18,6 +18,8 @@ if (cfg && cfg.apiKey && window.firebase && firebase.firestore && firebase.auth)
     S.ctx = options; window.Nube.enabled = true;
     firebase.initializeApp(cfg);
     S.fdb = firebase.firestore(); S.auth = firebase.auth(); S.auth.languageCode = 'es';   // correos de Firebase en español
+    // Redes con proxy/firewall (universidades) o bloqueadores: si el canal normal no conecta, Firestore cambia solo a "long polling".
+    try { S.fdb.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { console.warn('Nube: settings', e && e.message); }
     S.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
     S.fdb.enablePersistence({ synchronizeTabs: true }).catch((e) => console.warn('Nube: sin caché sin conexión', e && e.code));
     S.ui.applyAccess = applyAccess; S.ui.resetAccess = resetAccess;

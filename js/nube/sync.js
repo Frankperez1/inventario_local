@@ -54,6 +54,13 @@ export function pushNow() {
   const items = collectDirty();
   if (!items.length) { if (S.pending.size === 0) { S.ui.setState(navigator.onLine ? 'ok' : 'offline'); if (!S.uploaded) S.notifyUpload = false; } return; }
   S.ui.setState('sync', `${items.length} por subir`);
+  // Si la nube no confirma en 20 s, no dejar el estado azul para siempre: decir qué puede estar pasando.
+  clearTimeout(S.syncWatch);
+  S.syncWatch = setTimeout(() => {
+    if (S.pending.size > 0 && navigator.onLine && S.state === 'sync') {
+      S.ui.setState('error', `La nube no responde (${S.pending.size} cambio(s) sin confirmar). Si usa Brave u otro bloqueador, desactive el escudo/bloqueador para este sitio y recargue; también puede ser la red. Sus datos siguen guardados en este equipo y se subirán solos al conectar.`);
+    }
+  }, 20000);
   for (let i = 0; i < items.length; i += BATCH) {
     const chunk = items.slice(i, i + BATCH);
     const batch = S.fdb.batch();
@@ -82,6 +89,7 @@ export function pushNow() {
         if (a._avisoNext) { a._avisoKey = a._avisoNext; delete a._avisoNext; }
       });
       if (S.pending.size === 0) {
+        clearTimeout(S.syncWatch);
         S.ctx.persist(); S.ui.setState('ok');
         if (S.notifyUpload && S.uploaded > 0) {
           showToast('☁ Datos subidos', `Se subieron ${S.uploaded} registro(s) a la cuenta ${S.user ? S.user.email : ''}.`, 'ok');
@@ -90,6 +98,7 @@ export function pushNow() {
         if (S.ui.checkLoginWarning) S.ui.checkLoginWarning();
       }
     }).catch((err) => {
+      clearTimeout(S.syncWatch);
       chunk.forEach(({ a }) => S.pending.delete(a.id));
       S.errorUntil = Date.now() + ERROR_BACKOFF_MS;
       const code = err && err.code;

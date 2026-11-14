@@ -201,3 +201,14 @@ Los grupos son los de la columna `GRUPO` de `inventario.xlsx`.
 4. **GitHub Pages** (opcional, da https, que la cámara necesita): Settings → Pages → rama `main`, carpeta `/ (root)`. Para que funcione con datos reales el repositorio debe incluir `data/` (privado) y, en Firebase → Authentication → Settings → *Authorized domains*, agregue `USUARIO.github.io`; si no, el inicio de sesión falla.
 5. **Reglas de Firestore**: publique `firestore.rules` (consola de Firebase → Firestore → Reglas, o `firebase deploy --only firestore:rules`).
 6. La `apiKey` de `firebase-config.js` no es secreta (la protegen las reglas), pero si el repositorio es público conviene restringirla por dominio en Google Cloud → APIs y servicios → Credenciales. **Nunca** suba archivos `serviceAccount*.json` ni `.env` (ya están en `.gitignore`).
+
+## Icono de la pestaña (favicon)
+
+- Se usa el logo de la UNCP: `favicon.ico`, `assets/favicon-64.png`, `assets/favicon-192.png` y `assets/apple-touch-icon.png` (ícono al "agregar a la pantalla de inicio" en iPhone).
+- Para cambiarlo, reemplace esos archivos por su imagen (PNG cuadrado, ideal 192×192 o más) con los **mismos nombres**, y suba `?v=2` en los `<link rel="icon">` de `index.html` si el navegador sigue mostrando el anterior (los navegadores guardan el ícono en caché; pruebe también Ctrl+F5).
+
+## Si la nube se queda en "Sincronizando…"
+
+- Pulse el botón azul ☁: abajo dice cuántos cambios "por subir" hay. A los 20 s sin respuesta el botón pasa a **rojo** con la explicación.
+- Causa frecuente: el **bloqueador del navegador** (Brave Shields, uBlock, AdGuard) bloquea `firestore.googleapis.com`. Desactive el escudo para el sitio (ícono del león → "Escudos desactivados") y recargue. Otra causa: una red con firewall (la app ya reintenta con *long polling*).
+- Compruebe también que publicó `firestore.rules` y que `usuario.github.io` está en Authentication → Authorized domains.
