@@ -1,0 +1,4 @@
+Aqui van los datos de la UNCP que la app necesita:
+  inventario.xlsx    (catalogo de bienes y grupos)
+  datos-extra.json   (fechas, estado y responsables de cada bien)
+No se suben a Git por defecto porque incluyen nombres de personas. Copie los dos archivos aqui despues de clonar el repositorio.

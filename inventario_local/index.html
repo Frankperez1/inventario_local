@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f4a24" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Inventario de bienes · UNCP</title>
+    <link rel="icon" href="favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon-64.png?v=1" />
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/favicon-192.png?v=1" />
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/styles.css?v=30" />
+    <link rel="stylesheet" href="css/nube.css?v=7" />
+    <link rel="stylesheet" href="css/tema-uncp.css?v=4" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <img class="brand-logo" src="assets/logo-uncp.png" alt="Logo Universidad Nacional del Centro del Perú" />
+          <div>
+            <p class="eyebrow">Universidad Nacional del Centro del Perú</p>
+            <h1>Inventario de bienes patrimoniales</h1>
+          </div>
+        </div>
+        <span class="online"><span class="status-dot"></span>Listo para registrar</span>
+      </header>
+
+      <section class="card location-card" aria-labelledby="location-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Ubicación de trabajo</p>
+            <h2 id="location-title">Seleccione el ambiente</h2>
+          </div>
+          <button id="new-room-button" class="button button-secondary" type="button">+ Ambiente</button>
+        </div>
+        <div class="location-grid">
+          <div class="field">
+            <span class="field-label">Local</span>
+            <div class="custom-select">
+              <button type="button" class="custom-select-trigger" aria-haspopup="listbox" aria-label="Local"><span class="custom-select-value">—</span></button>
+              <div class="custom-select-dropdown" hidden>
+                <input type="text" class="custom-select-search" autocomplete="off" placeholder="Buscar local…" aria-label="Buscar local" />
+                <ul class="custom-select-panel" role="listbox"></ul>
+              </div>
+              <select id="local-select" class="visually-hidden-select" tabindex="-1" aria-hidden="true"></select>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">Área</span>
+            <div class="custom-select">
+              <button type="button" class="custom-select-trigger" aria-haspopup="listbox" aria-label="Área"><span class="custom-select-value">—</span></button>
+              <div class="custom-select-dropdown" hidden>
+                <input type="text" class="custom-select-search" autocomplete="off" placeholder="Buscar área…" aria-label="Buscar área" />
+                <ul class="custom-select-panel" role="listbox"></ul>
+              </div>
+              <select id="area-select" class="visually-hidden-select" tabindex="-1" aria-hidden="true"></select>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">Ambiente</span>
+            <div class="custom-select">
+              <button type="button" class="custom-select-trigger" aria-haspopup="listbox" aria-label="Ambiente"><span class="custom-select-value">—</span></button>
+              <div class="custom-select-dropdown" hidden>
+                <input type="text" class="custom-select-search" autocomplete="off" placeholder="Buscar ambiente…" aria-label="Buscar ambiente" />
+                <ul class="custom-select-panel" role="listbox"></ul>
+              </div>
+              <select id="room-select" class="visually-hidden-select" tabindex="-1" aria-hidden="true"></select>
+            </div>
+          </div>
+        </div>
+        <!-- Encargado del ambiente: sale solo del inventario.xlsx (columnas NRO_DOC_IDENT_PERSONAL /
+             APELLIDO_PATERNO / APELLIDO_MATERNO / NOMBRES según NOMBRE_OFICINA). No se escribe a mano:
+             cambia solo al cambiar de ambiente. -->
+        <div id="custodio-banner" class="custodio-banner" hidden>
+          <span class="custodio-icon">👤</span>
+          <div class="custodio-body">
+            <p class="custodio-label">Encargado del ambiente</p>
+            <p id="custodio-name" class="custodio-name">—</p>
+            <p id="custodio-extra" class="custodio-extra" hidden></p>
+          </div>
+        </div>
+        <div class="room-actions">
+          <button id="previous-room" class="button button-secondary" type="button">← Anterior</button>
+          <button id="edit-room-button" class="button button-secondary" type="button">Editar ambiente</button>
+          <button id="next-room" class="button button-secondary" type="button">Siguiente →</button>
+        </div>
+        <div class="start-actions">
+          <!-- Inventariador: se pide UNA sola vez y queda guardado en este navegador; ya no se
+               vuelve a preguntar al cambiar de ambiente. Desde aquí se cambia o se cierra. -->
+          <div id="inventariador-bar" class="inventariador-bar" hidden>
+            <span class="inventariador-icon">🧑‍💼</span>
+            <div class="inventariador-body">
+              <p class="inventariador-label">Inventariador (quien está registrando)</p>
+              <p id="inventariador-name" class="inventariador-name">—</p>
+            </div>
+            <div class="inventariador-actions">
+              <button id="change-inventariador-button" class="button button-secondary" type="button">Cambiar</button>
+              <button id="close-inventariador-button" class="button button-secondary" type="button">Cerrar</button>
+            </div>
+          </div>
+          <div class="start-actions-buttons">
+            <button id="start-inventory-button" class="button button-primary" type="button">▶ Iniciar inventario</button>
+            <button id="consult-button" class="button button-outline" type="button">🔍 Consultar código</button>
+            <button id="search4-button" class="button button-outline" type="button">🔢 Buscar por 4 dígitos</button>
+            <button id="search-all-button" class="button button-outline" type="button">🔎 Buscar en todo el inventario</button>
+            <button id="missing-report-button" class="button button-outline" type="button">📋 Reporte de faltantes por ambiente</button>
+            <button id="acta-button" class="button button-outline" type="button">📄 Actas de verificación física (toda el área)</button>
+            <button id="notes-button" class="button button-outline" type="button">📝 Comentarios y características</button>
+            <button id="encargados-area-button" class="button button-outline" type="button">👥 Encargados de toda el área</button>
+          </div>
+          <p id="session-message" class="session-message" aria-live="polite"></p>
+        </div>
+        <div class="backup-actions">
+          <span class="field-label">Respaldo completo (todos los locales, áreas y ambientes)</span>
+          <div class="backup-actions-buttons">
+            <button id="export-backup-button" class="button button-outline" type="button">📤 Exportar respaldo</button>
+            <button id="import-backup-button" class="button button-outline" type="button">📥 Importar respaldo</button>
+            <input id="import-backup-input" type="file" accept="application/json,.json" hidden />
+          </div>
+          <label class="backup-replace-option">
+            <input id="import-replace-checkbox" type="checkbox" />
+            <span class="backup-replace-toggle" aria-hidden="true"></span>
+            <span class="backup-replace-text">
+              <strong>Reemplazar todo en vez de combinar</strong>
+              <small>Borra lo que hay ahora en este navegador</small>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <section id="scan-card" class="card scan-card" aria-labelledby="scan-title" hidden>
+        <div class="section-heading">
+          <div>
+            <p id="scan-eyebrow" class="eyebrow">Registro rápido</p>
+            <h2 id="scan-title">Escanee o digite el código</h2>
+          </div>
+          <div class="scan-card-actions">
+            <button id="sound-button" class="button button-secondary" type="button" title="Activar o silenciar los sonidos de confirmación">🔊 Sonido</button>
+            <button id="camera-button" class="button button-primary" type="button">Abrir cámara</button>
+            <button id="close-scan-button" class="button button-secondary" type="button" hidden>Cerrar consulta</button>
+          </div>
+        </div>
+        <div id="mode-banner" class="mode-banner mode-registro" role="status" aria-live="polite">
+          <span id="mode-banner-text">● REGISTRANDO — cada código que escanee se agrega al inventario</span>
+          <button id="mode-back-button" class="button button-primary" type="button" hidden>↩ Volver a registrar</button>
+        </div>
+        <label id="auto-return-label" class="auto-return" hidden>
+          <input id="auto-return-checkbox" type="checkbox" checked />
+          <span>Volver a registrar solo después de cada consulta o búsqueda</span>
+        </label>
+        <form id="code-form" class="code-form">
+          <div class="code-input-wrap">
+            <input id="code-input" autocomplete="off" inputmode="numeric" placeholder="Código patrimonial" aria-label="Código patrimonial" />
+          </div>
+          <button id="code-submit-button" class="button button-primary" type="submit">Buscar y registrar</button>
+        </form>
+        <div id="reader" class="reader" hidden></div>
+        <div id="reader-tools" class="reader-tools" hidden>
+          <span id="reader-status" class="reader-status" aria-live="polite"></span>
+          <button id="ocr-button" class="button reader-btn" type="button">🤖 Leer número</button>
+          <button id="torch-button" class="button reader-btn" type="button" hidden>🔦 Linterna</button>
+          <input id="zoom-range" class="reader-zoom" type="range" aria-label="Zoom" hidden />
+        </div>
+        <div id="scan-result" class="scan-result" hidden>
+          <p id="scan-result-title" class="scan-result-title"></p>
+          <p id="scan-result-location" class="scan-result-location"></p>
+        </div>
+        <p id="scan-message" class="message" aria-live="polite"></p>
+      </section>
+
+      <section class="card inventory-card" aria-labelledby="inventory-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Bienes registrados</p>
+            <h2 id="inventory-title">Inventario del ambiente</h2>
+          </div>
+          <div class="exports">
+            <button id="comment-button" class="button button-gold" type="button">💬 Añadir comentario</button>
+            <button id="save-button" class="button button-primary" type="button">💾 Guardar</button>
+            <button id="excel-button" class="button button-secondary" type="button">Excel</button>
+            <button id="pdf-button" class="button button-secondary" type="button">PDF</button>
+          </div>
+        </div>
+        <div id="room-comment-banner" class="room-comment-banner" hidden>
+          <span class="room-comment-icon">💬</span>
+          <p id="room-comment-text" class="room-comment-text"></p>
+          <button id="remove-comment-button" class="room-comment-remove" type="button" title="Quitar comentario" aria-label="Quitar comentario">✕</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Ítem</th><th>Código patrimonial</th><th>Tipo de bien</th><th>Características</th><th>Ubicación registrada</th><th>Estado</th><th>Comentario</th><th>Acción</th></tr></thead>
+            <tbody id="inventory-body"></tbody>
+          </table>
+        </div>
+        <p id="empty-message" class="empty-message">Aún no hay bienes registrados en este ambiente.</p>
+      </section>
+    </main>
+
+    <!-- Navegador flotante ▲▼ de "bien actual" para ir marcando fila por fila mientras se
+         pegan los stickers. Vive fuera de #scan-card a propósito: no comparte nada con la
+         sesión de escaneo/cámara, así que usarlo nunca puede detener el escaneo. -->
+    <div id="row-navigator" class="row-navigator" hidden>
+      <button id="row-nav-up" class="row-nav-button" type="button" title="Fila anterior" aria-label="Fila anterior">▲</button>
+      <span id="row-nav-counter" class="row-nav-counter">0 / 0</span>
+      <button id="row-nav-down" class="row-nav-button" type="button" title="Fila siguiente" aria-label="Fila siguiente">▼</button>
+    </div>
+
+    <dialog id="comment-dialog">
+      <form id="comment-form" method="dialog">
+        <h2>💬 Observaciones generales</h2>
+        <p class="dialog-hint">Esta nota es sobre todo el ambiente (no sobre un bien en particular) y aparecerá en el PDF exportado.</p>
+        <label>Comentario<textarea id="comment-textarea" maxlength="500" rows="4" placeholder="Ej.: Faltan 2 sillas por ubicar, revisar la próxima semana…"></textarea></label>
+        <menu><button id="cancel-comment" class="button button-secondary" value="cancel" type="button">Cancelar</button><button class="button button-gold" value="default" type="submit">Guardar comentario</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="encargados-area-dialog">
+      <div class="search-dialog-content enc-content">
+        <h2>👥 Encargados de toda el área</h2>
+        <p id="encargados-area-title" class="dialog-hint"></p>
+        <label class="enc-filter">Filtrar por nombre, DNI o ambiente
+          <input id="encargados-area-filter" type="search" autocomplete="off" placeholder="Escriba para filtrar…" />
+        </label>
+        <div id="encargados-area-summary"></div>
+
+        <div class="enc-scroll">
+        <h3 class="missing-subtitle">🧑‍💼 Por persona</h3>
+        <div class="table-wrap search-results-wrap">
+          <table>
+            <thead><tr><th>Ítem</th><th>Encargado</th><th>DNI</th><th>Ambientes</th><th>Bienes (Excel)</th><th>Ambientes a su cargo</th></tr></thead>
+            <tbody id="encargados-area-people"></tbody>
+          </table>
+        </div>
+
+        <h3 class="missing-subtitle">🏢 Por ambiente</h3>
+        <div class="table-wrap search-results-wrap">
+          <table>
+            <thead><tr><th>Ítem</th><th>Ambiente</th><th>Encargado(s)</th></tr></thead>
+            <tbody id="encargados-area-rooms"></tbody>
+          </table>
+        </div>
+        <p id="encargados-area-empty" class="empty-message" hidden>No hay encargados para mostrar en esta área.</p>
+        </div>
+        <menu>
+          <button id="encargados-area-export" class="button button-secondary" type="button">Exportar a PDF</button>
+          <button id="encargados-area-close" class="button button-primary" type="button">Cerrar</button>
+        </menu>
+      </div>
+    </dialog>
+
+    <dialog id="notes-dialog">
+      <div class="search-dialog-content">
+        <h2>📝 Comentarios y características</h2>
+        <p class="dialog-hint">Todo el inventario (todos los locales, áreas y ambientes): bienes ya inventariados ✅ que tienen un comentario y/o las características (marca, modelo, color, serie…) puestas, más las observaciones generales de cada ambiente.</p>
+        <label>Filtrar por código, tipo, ubicación, característica o comentario
+          <input id="notes-filter" type="search" autocomplete="off" placeholder="Escriba para filtrar…" />
+        </label>
+        <p id="notes-count" class="dialog-hint"></p>
+        <div id="notes-rooms" class="notes-rooms"></div>
+        <div class="table-wrap search-results-wrap">
+          <table>
+            <thead><tr><th>Ítem</th><th>Código</th><th>Tipo de bien</th><th>Inventariado en (Local — Área — Ambiente)</th><th>Características</th><th>Comentario</th></tr></thead>
+            <tbody id="notes-body"></tbody>
+          </table>
+        </div>
+        <p id="notes-empty-message" class="empty-message" hidden>Todavía no hay comentarios ni características agregados en ningún bien del inventario.</p>
+        <menu><button id="notes-close-button" class="button button-primary" type="button">Cerrar</button></menu>
+      </div>
+    </dialog>
+
+    <dialog id="room-dialog">
+      <form id="room-form" method="dialog">
+        <h2 id="dialog-title">Nuevo ambiente</h2>
+        <label>Nombre del ambiente<input id="room-name-input" required maxlength="100" placeholder="Ej.: Aula 304" /></label>
+        <menu><button id="cancel-room" class="button button-secondary" value="cancel" type="button">Cancelar</button><button class="button button-primary" value="default" type="submit">Guardar</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="encargados-dialog">
+      <form id="encargados-form" method="dialog">
+        <h2 id="encargados-dialog-title">¿Quién va a inventariar?</h2>
+        <p class="dialog-hint">Se pide una sola vez. Queda guardado y se usa en todos los ambientes hasta que lo cambie o lo cierre. El <strong>encargado de cada ambiente</strong> no se escribe aquí: sale solo del inventario.xlsx.</p>
+        <label>Nombre del inventariador (o inventariadores)<input id="encargados-input" required maxlength="200" placeholder="Ej.: Juan Pérez, María Gómez" /></label>
+        <menu><button id="cancel-encargados" class="button button-secondary" value="cancel" type="button">Cancelar</button><button id="encargados-submit" class="button button-primary" value="default" type="submit">Iniciar inventario</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="search-dialog">
+      <div class="search-dialog-content">
+        <h2>🔎 Buscar en todo el inventario</h2>
+        <p class="dialog-hint">Busca entre TODOS los bienes ya registrados, en cualquier local/área/ambiente. Útil para responder "¿cuántos bienes de tal facultad/ambiente se encontraron?" o para ubicar un código específico.</p>
+        <label>Buscar por código, tipo, encargado o comentario
+          <input id="search-query-input" type="text" autocomplete="off" placeholder="Ej.: 746425, carpeta, Frank, desuso…" />
+        </label>
+        <div class="search-filters-grid">
+          <div class="field">
+            <span class="field-label">Local</span>
+            <div class="custom-select">
+              <button type="button" class="custom-select-trigger" aria-haspopup="listbox" aria-label="Local"><span class="custom-select-value">—</span></button>
+              <div class="custom-select-dropdown" hidden>
+                <input type="text" class="custom-select-search" autocomplete="off" placeholder="Buscar local…" aria-label="Buscar local" />
+                <ul class="custom-select-panel" role="listbox"></ul>
+              </div>
+              <select id="search-local-select" class="visually-hidden-select" tabindex="-1" aria-hidden="true"></select>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">Área</span>
+            <div class="custom-select">
+              <button type="button" class="custom-select-trigger" aria-haspopup="listbox" aria-label="Área"><span class="custom-select-value">—</span></button>
+              <div class="custom-select-dropdown" hidden>
+                <input type="text" class="custom-select-search" autocomplete="off" placeholder="Buscar área…" aria-label="Buscar área" />
+                <ul class="custom-select-panel" role="listbox"></ul>
+              </div>
+              <select id="search-area-select" class="visually-hidden-select" tabindex="-1" aria-hidden="true"></select>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">Ambiente</span>
+            <div class="custom-select">
+              <button type="button" class="custom-select-trigger" aria-haspopup="listbox" aria-label="Ambiente"><span class="custom-select-value">—</span></button>
+              <div class="custom-select-dropdown" hidden>
+                <input type="text" class="custom-select-search" autocomplete="off" placeholder="Buscar ambiente…" aria-label="Buscar ambiente" />
+                <ul class="custom-select-panel" role="listbox"></ul>
+              </div>
+              <select id="search-room-select" class="visually-hidden-select" tabindex="-1" aria-hidden="true"></select>
+            </div>
+          </div>
+          <label>Estado
+            <select id="search-state-select">
+              <option value="">Todos</option>
+              <option>Bueno</option>
+              <option>Regular</option>
+              <option>Malo</option>
+            </select>
+          </label>
+        </div>
+        <p id="search-summary" class="search-summary"></p>
+        <div class="table-wrap search-results-wrap">
+          <table>
+            <thead><tr><th>Ítem</th><th>Código</th><th>Tipo de bien</th><th>Inventariado en (Local — Área — Ambiente)</th><th>Ubicación en Excel</th><th>Estado</th><th>Inventariador</th><th>Fecha y hora</th><th>Comentario</th><th>Alerta</th></tr></thead>
+            <tbody id="search-results-body"></tbody>
+          </table>
+        </div>
+        <p id="search-empty-message" class="empty-message" hidden>No se encontraron bienes con esos filtros.</p>
+        <menu>
+          <button id="search-clear-button" class="button button-secondary" type="button">Limpiar filtros</button>
+          <button id="search-export-button" class="button button-secondary" type="button">Exportar a PDF</button>
+          <button id="search-close-button" class="button button-primary" type="button">Cerrar</button>
+        </menu>
+      </div>
+    </dialog>
+
+    <dialog id="missing-dialog">
+      <div class="search-dialog-content">
+        <h2>📋 Reporte de bienes faltantes por ambiente</h2>
+        <p class="dialog-hint">Elija Local, Área y Ambiente para ver qué bienes de ESE ambiente (según inventario.xlsx) todavía no fueron encontrados, y cuáles sí se encontraron pero registrados en otro ambiente/área.</p>
+        <div class="missing-filters-grid">
+          <div class="field">
+            <span class="field-label">Local</span>
+            <div class="custom-select">
+              <button type="button" class="custom-select-trigger" aria-haspopup="listbox" aria-label="Local"><span class="custom-select-value">—</span></button>
+              <div class="custom-select-dropdown" hidden>
+                <input type="text" class="custom-select-search" autocomplete="off" placeholder="Buscar local…" aria-label="Buscar local" />
+                <ul class="custom-select-panel" role="listbox"></ul>
+              </div>
+              <select id="missing-local-select" class="visually-hidden-select" tabindex="-1" aria-hidden="true"></select>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">Área</span>
+            <div class="custom-select">
+              <button type="button" class="custom-select-trigger" aria-haspopup="listbox" aria-label="Área"><span class="custom-select-value">—</span></button>
+              <div class="custom-select-dropdown" hidden>
+                <input type="text" class="custom-select-search" autocomplete="off" placeholder="Buscar área…" aria-label="Buscar área" />
+                <ul class="custom-select-panel" role="listbox"></ul>
+              </div>
+              <select id="missing-area-select" class="visually-hidden-select" tabindex="-1" aria-hidden="true"></select>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">Ambiente</span>
+            <div class="custom-select">
+              <button type="button" class="custom-select-trigger" aria-haspopup="listbox" aria-label="Ambiente"><span class="custom-select-value">—</span></button>
+              <div class="custom-select-dropdown" hidden>
+                <input type="text" class="custom-select-search" autocomplete="off" placeholder="Buscar ambiente…" aria-label="Buscar ambiente" />
+                <ul class="custom-select-panel" role="listbox"></ul>
+              </div>
+              <select id="missing-room-select" class="visually-hidden-select" tabindex="-1" aria-hidden="true"></select>
+            </div>
+          </div>
+        </div>
+        <p id="missing-summary" class="search-summary"></p>
+
+        <h3 class="missing-subtitle">✅ Bienes encontrados en este ambiente (le pertenecen)</h3>
+        <div class="table-wrap search-results-wrap">
+          <table>
+            <thead><tr><th>Ítem</th><th>Código</th><th>Tipo de bien</th><th>Características</th><th>Fecha de adquisición</th><th>Estado</th><th>Registrado</th></tr></thead>
+            <tbody id="missing-inplace-body"></tbody>
+          </table>
+        </div>
+        <p id="missing-inplace-empty" class="empty-message" hidden>Todavía no se encontró ningún bien de este ambiente.</p>
+
+        <h3 class="missing-subtitle">❌ Bienes faltantes (de este ambiente, nunca escaneados)</h3>
+        <div class="table-wrap search-results-wrap">
+          <table>
+            <thead><tr><th>Ítem</th><th>Código</th><th>Tipo de bien</th><th>Detalle técnico</th><th>Fecha de adquisición</th></tr></thead>
+            <tbody id="missing-notfound-body"></tbody>
+          </table>
+        </div>
+        <p id="missing-notfound-empty" class="empty-message" hidden>Todos los bienes de este ambiente fueron encontrados.</p>
+
+        <h3 class="missing-subtitle">📥 Bienes encontrados aquí pero que pertenecen a otra área/ambiente</h3>
+        <div class="table-wrap search-results-wrap">
+          <table>
+            <thead><tr><th>Ítem</th><th>Código</th><th>Tipo de bien</th><th>Pertenece a (según Excel)</th><th>Fecha de adquisición</th><th>Estado</th><th>Registrado</th></tr></thead>
+            <tbody id="missing-extra-body"></tbody>
+          </table>
+        </div>
+        <p id="missing-extra-empty" class="empty-message" hidden>No hay bienes de otros ambientes escaneados aquí.</p>
+
+        <h3 class="missing-subtitle">🔁 Bienes de este ambiente que se encontraron en otro ambiente</h3>
+        <div class="table-wrap search-results-wrap">
+          <table>
+            <thead><tr><th>Ítem</th><th>Código</th><th>Tipo de bien</th><th>Encontrado en</th><th>Estado</th></tr></thead>
+            <tbody id="missing-found-body"></tbody>
+          </table>
+        </div>
+        <p id="missing-found-empty" class="empty-message" hidden>No hay bienes de este ambiente encontrados en otro lugar.</p>
+
+        <menu>
+          <button id="missing-export-button" class="button button-secondary" type="button">Exportar a PDF</button>
+          <button id="missing-close-button" class="button button-primary" type="button">Cerrar</button>
+        </menu>
+      </div>
+    </dialog>
+
+    <dialog id="acta-dialog">
+      <div class="search-dialog-content">
+        <h2>📄 Actas de verificación física</h2>
+        <p class="dialog-hint">Se genera un solo PDF con el acta de cada ambiente del área seleccionada (una hoja por ambiente). Todo queda en blanco para completarlo a mano; solo cambian los inventariadores.</p>
+        <p class="field-label">Facultad / Oficina / Unidad / Área</p>
+        <p id="acta-area-label" class="search-summary"></p>
+
+        <h3 class="missing-subtitle">Inventariadores (equipo técnico)</h3>
+        <div id="acta-team" class="acta-team"></div>
+        <p class="dialog-hint">Se guardan en este navegador: la próxima vez ya salen con estos nombres.</p>
+        <button id="acta-add-member" class="button button-secondary" type="button">+ Añadir inventariador</button>
+
+        <h3 class="missing-subtitle">Ambientes que llevarán acta</h3>
+        <div class="acta-picker">
+          <div class="acta-quick">
+            <button id="acta-select-all" class="button button-secondary" type="button">✔ Todo el área</button>
+            <button id="acta-select-none" class="button button-secondary" type="button">Ninguno</button>
+          </div>
+          <div class="acta-nums">
+            <input id="acta-nums-input" type="text" inputmode="numeric" autocomplete="off" placeholder="Por número: 1, 2, 10 o 3-5" aria-label="Elegir ambientes por número" />
+            <button id="acta-select-nums" class="button button-secondary" type="button">Elegir</button>
+          </div>
+        </div>
+        <div id="acta-rooms" class="acta-rooms"></div>
+        <p id="acta-count" class="search-summary"></p>
+
+        <menu>
+          <button id="acta-cancel-button" class="button button-secondary" type="button">Cancelar</button>
+          <button id="acta-generate-button" class="button button-primary" type="button">Generar actas (PDF)</button>
+        </menu>
+      </div>
+    </dialog>
+
+    <script src="libs/html5-qrcode.min.js"></script>
+    <script>if(!(window.Html5Qrcode))document.write('<script src="https://unpkg.com/html5-qrcode"><\/script>');</script>
+    <script src="libs/xlsx.full.min.js"></script>
+    <script>if(!(window.XLSX))document.write('<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"><\/script>');</script>
+    <script src="libs/jspdf.umd.min.js"></script>
+    <script>if(!(window.jspdf))document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>');</script>
+    <script src="libs/jspdf.plugin.autotable.min.js"></script>
+    <script>if(!(window.jspdf&&window.jspdf.jsPDF.API.autoTable))document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"><\/script>');</script>
+    <script src="firebase-config.js"></script>
+    <script>if(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey)document.write('<script src="libs/firebase-app-compat.js"><\/script>');</script>
+    <script>if(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey&&!(window.firebase))document.write('<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"><\/script>');</script>
+    <script>if(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey)document.write('<script src="libs/firebase-auth-compat.js"><\/script>');</script>
+    <script>if(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey&&!(window.firebase&&firebase.auth))document.write('<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"><\/script>');</script>
+    <script>if(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey)document.write('<script src="libs/firebase-firestore-compat.js"><\/script>');</script>
+    <script>if(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey&&!(window.firebase&&firebase.firestore))document.write('<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"><\/script>');</script>
+    <script type="module" src="js/nube/index.js?v=12"></script>
+    <script src="assets/logo-data.js?v=6" defer></script>
+    <script src="js/escaner.js?v=4" defer></script>
+    <script src="js/app.js?v=51" defer></script>
+  </body>
+</html>
