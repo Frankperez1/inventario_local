@@ -15,7 +15,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/styles.css?v=30" />
+    <link rel="stylesheet" href="css/styles.css?v=32" />
     <link rel="stylesheet" href="css/nube.css?v=7" />
     <link rel="stylesheet" href="css/tema-uncp.css?v=4" />
   </head>
@@ -39,6 +39,7 @@
             <h2 id="location-title">Seleccione el ambiente</h2>
           </div>
           <button id="new-room-button" class="button button-secondary" type="button">+ Ambiente</button>
+          <button id="created-rooms-button" class="button button-secondary" type="button" title="Ver todos los ambientes que creé a mano">📍 Mis ambientes creados</button>
         </div>
         <div class="location-grid">
           <div class="field">
@@ -157,7 +158,7 @@
         </label>
         <form id="code-form" class="code-form">
           <div class="code-input-wrap">
-            <input id="code-input" autocomplete="off" inputmode="numeric" placeholder="Código patrimonial" aria-label="Código patrimonial" />
+            <input id="code-input" autocomplete="off" autocapitalize="characters" inputmode="text" placeholder="Código patrimonial" aria-label="Código patrimonial" />
           </div>
           <button id="code-submit-button" class="button button-primary" type="submit">Buscar y registrar</button>
         </form>
@@ -280,6 +281,15 @@
         <h2 id="dialog-title">Nuevo ambiente</h2>
         <label>Nombre del ambiente<input id="room-name-input" required maxlength="100" placeholder="Ej.: Aula 304" /></label>
         <menu><button id="cancel-room" class="button button-secondary" value="cancel" type="button">Cancelar</button><button class="button button-primary" value="default" type="submit">Guardar</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="created-rooms-dialog">
+      <form method="dialog" id="created-rooms-form">
+        <h2>📍 Ambientes creados</h2>
+        <p class="dialog-hint" id="created-rooms-hint"></p>
+        <ul id="created-rooms-list" class="created-rooms-list"></ul>
+        <menu><button id="created-rooms-close" class="button button-secondary" value="cancel" type="button">Cerrar</button></menu>
       </form>
     </dialog>
 
@@ -493,6 +503,6 @@
     <script type="module" src="js/nube/index.js?v=11"></script>
     <script src="assets/logo-data.js?v=6" defer></script>
     <script src="js/escaner.js?v=4" defer></script>
-    <script src="js/app.js?v=50" defer></script>
+    <script src="js/app.js?v=53" defer></script>
   </body>
 </html>

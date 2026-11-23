@@ -637,3 +637,11 @@ tr:nth-child(1) > td > .enc-rank{background:var(--gold-soft);border-color:rgba(2
 .reader-btn{padding:6px 12px;font-size:.82rem}
 .reader-btn.on{background:var(--gold,#ffc93d);color:#1a1200}
 .reader-zoom{flex:1;min-width:120px}
+
+.custom-select-group{margin-top:6px;padding:9px 10px 4px;border-top:1px solid rgba(0,0,0,.1);font-size:.68rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--accent-strong);cursor:default;pointer-events:none}
+.custom-select-group[hidden]{display:none}
+#created-rooms-dialog{width:min(94vw,560px)}
+.created-rooms-list{list-style:none;margin:14px 0 0;padding:0;max-height:55vh;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.created-rooms-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid rgba(0,0,0,.12);border-radius:10px}
+.created-rooms-list .cr-name{font-weight:700}
+.created-rooms-list .cr-path{display:block;font-size:.8rem;opacity:.75;margin-top:2px}

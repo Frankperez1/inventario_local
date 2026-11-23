@@ -180,6 +180,11 @@ function setAccess(grupos) {
       const roomId = a.homeRoomId || a.roomId;
       if (roomId) roomAccess.add(roomId);
     }
+    // Los ambientes CREADOS a mano no tienen bienes del Excel con grupo, así que antes se perdían al
+    // recargar (solo se veían en la sesión en que se crearon). Ahora se muestran siempre, dentro de
+    // las áreas a las que este usuario ya tiene acceso.
+    const areasConAcceso = new Set(db.rooms.filter((r) => roomAccess.has(r.id)).map((r) => r.areaId));
+    for (const r of db.rooms) { if (areasConAcceso.has(r.areaId) && esAmbienteCreado(r)) roomAccess.add(r.id); }
   }
   renderSelectors(); switchRoomSession();
 }
@@ -392,6 +397,15 @@ function filterCustomSelect(id, query) {
     li.hidden = !match;
     if (match) anyVisible = true;
   });
+  // El rótulo de un grupo ("AMBIENTES CREADOS") solo se ve si al menos uno de sus ambientes coincide.
+  let grupoActual = null, grupoTieneVisibles = false;
+  custom.panel.querySelectorAll('.custom-select-group, .custom-select-option').forEach((el) => {
+    if (el.classList.contains('custom-select-group')) {
+      if (grupoActual) grupoActual.hidden = !grupoTieneVisibles;
+      grupoActual = el; grupoTieneVisibles = false;
+    } else if (!el.hidden) grupoTieneVisibles = true;
+  });
+  if (grupoActual) grupoActual.hidden = !grupoTieneVisibles;
   let emptyEl = custom.panel.querySelector('.custom-select-empty');
   if (!anyVisible) {
     if (!emptyEl) {
@@ -419,8 +433,11 @@ function syncCustomSelect(id) {
   const custom = customSelects[id];
   if (!custom) return;
   const { select, valueEl, panel, wrapper, dropdown, searchInput } = custom;
-  panel.innerHTML = Array.from(select.options).map((opt) =>
-    `<li class="custom-select-option${opt.selected ? ' is-selected' : ''}" role="option" data-value="${safe(opt.value)}">${safe(opt.textContent)}</li>`
+  const optionLi = (opt) =>
+    `<li class="custom-select-option${opt.selected ? ' is-selected' : ''}" role="option" data-value="${safe(opt.value)}">${safe(opt.textContent)}</li>`;
+  panel.innerHTML = Array.from(select.children).map((node) => node.tagName === 'OPTGROUP'
+    ? `<li class="custom-select-group" role="presentation">${safe(node.label)}</li>` + Array.from(node.children).map(optionLi).join('')
+    : optionLi(node)
   ).join('');
   panel.querySelectorAll('.custom-select-option').forEach((li) => {
     li.onclick = () => {
@@ -437,8 +454,53 @@ function syncCustomSelect(id) {
 window.addEventListener('resize', () => {
   Object.values(customSelects).forEach(({ valueEl }) => fitSelectValue(valueEl));
 });
+// === Ambientes CREADOS a mano (botón "Nuevo ambiente") ==============================
+// Se muestran aparte, bajo el rótulo "AMBIENTES CREADOS" al final de la lista, y NO entran en las
+// actas de verificación (esas son solo para los ambientes que vienen del inventario.xlsx).
+// Un ambiente es "creado" si se marcó con creado:true al crearlo, o -para los que se crearon
+// antes de existir esta marca- si ningún bien del Excel lo tiene como ubicación (ni por id ni por
+// nombre de área + ambiente). Si todavía no hay bienes cargados, solo vale la marca.
+const GRUPO_AMBIENTES_CREADOS = 'AMBIENTES CREADOS';
+let excelRoomCache = { n: -1, keys: new Set(), homes: new Set() };
+function excelRoomOrigins() {
+  if (excelRoomCache.n === db.assets.length) return excelRoomCache;
+  const keys = new Set(), homes = new Set(), memo = new Map();   // memo: son ~100 mil bienes pero pocos nombres distintos
+  for (const a of db.assets) {
+    if (a.isDuplicateClone) continue;
+    if (a.homeRoomId) homes.add(a.homeRoomId);
+    if (a.sourceRoom) {
+      const raw = a.sourceArea + '\u0001' + a.sourceRoom;
+      let k = memo.get(raw);
+      if (k === undefined) { k = header(a.sourceArea) + '|' + header(a.sourceRoom); memo.set(raw, k); }
+      keys.add(k);
+    }
+  }
+  excelRoomCache = { n: db.assets.length, keys, homes };
+  return excelRoomCache;
+}
+function esAmbienteCreado(room) {
+  if (!room) return false;
+  if (room.creado === true) return true;
+  const { keys, homes } = excelRoomOrigins();
+  if (!keys.size && !homes.size) return false;   // sin datos del Excel no se puede deducir
+  if (homes.has(room.id)) return false;
+  const areaName = db.areas.find((a) => a.id === room.areaId)?.name || '';
+  return !keys.has(header(areaName) + '|' + header(room.name));
+}
+// Primero los ambientes del Excel, al final los creados (conserva el orden alfabético dentro de cada grupo).
+const ordenarAmbientes = (rooms) => [...rooms.filter((r) => !esAmbienteCreado(r)), ...rooms.filter(esAmbienteCreado)];
+// <option>s de ambientes; los creados van dentro de un <optgroup> con el rótulo de arriba.
+function roomOptionsHtml(rooms, selectedId) {
+  const opt = (x) => `<option value="${safe(x.id)}" ${x.id === selectedId ? 'selected' : ''}>${safe(x.name || 'Sin nombre')}</option>`;
+  const normales = rooms.filter((r) => !esAmbienteCreado(r)), creados = rooms.filter(esAmbienteCreado);
+  return normales.map(opt).join('')
+    + (creados.length ? `<optgroup label="${GRUPO_AMBIENTES_CREADOS}">${creados.map(opt).join('')}</optgroup>` : '');
+}
 function options(select, data, selectedId) {
-  select.innerHTML = data.map((x) => `<option value="${safe(x.id)}" ${x.id === selectedId ? 'selected' : ''}>${safe(x.name)}</option>`).join('');
+  const sonAmbientes = data.length > 0 && data.every((x) => 'areaId' in x);
+  select.innerHTML = sonAmbientes
+    ? roomOptionsHtml(data, selectedId)
+    : data.map((x) => `<option value="${safe(x.id)}" ${x.id === selectedId ? 'selected' : ''}>${safe(x.name)}</option>`).join('');
   syncCustomSelect(select.id);
 }
 function renderSelectors() {
@@ -448,7 +510,7 @@ function renderSelectors() {
   const areas = visibleAreas().filter((x) => x.localId === db.selected.localId).sort((a, b) => a.name.localeCompare(b.name, 'es'));
   if (!areas.some((x) => x.id === db.selected.areaId)) db.selected.areaId = areas[0]?.id;
   options($('area-select'), areas, db.selected.areaId);
-  const rooms = visibleRooms().filter((x) => x.areaId === db.selected.areaId).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  const rooms = ordenarAmbientes(visibleRooms().filter((x) => x.areaId === db.selected.areaId).sort((a, b) => a.name.localeCompare(b.name, 'es')));
   if (!rooms.some((x) => x.id === db.selected.roomId)) db.selected.roomId = rooms[0]?.id;
   options($('room-select'), rooms, db.selected.roomId);
   save(); renderAssets(); renderCustodio();
@@ -652,8 +714,7 @@ function populateSearchFilters() {
   syncCustomSelect('search-area-select');
 
   const roomsInArea = visibleRooms().filter((r) => areaSel.value ? r.areaId === areaSel.value : areasInLocal.some((a) => a.id === r.areaId));
-  roomSel.innerHTML = '<option value="">Todos los ambientes</option>'
-    + roomsInArea.map((r) => `<option value="${safe(r.id)}">${safe(r.name || 'Sin nombre')}</option>`).join('');
+  roomSel.innerHTML = '<option value="">Todos los ambientes</option>' + roomOptionsHtml(roomsInArea, '');
   roomSel.value = roomsInArea.some((r) => r.id === prevRoom) ? prevRoom : '';
   syncCustomSelect('search-room-select');
 }
@@ -900,8 +961,7 @@ function populateMissingFilters() {
   syncCustomSelect('missing-area-select');
 
   const roomsInArea = visibleRooms().filter((r) => areaSel.value ? r.areaId === areaSel.value : areasInLocal.some((a) => a.id === r.areaId)).sort((a, b) => a.name.localeCompare(b.name, 'es'));
-  roomSel.innerHTML = '<option value="">Seleccione un ambiente…</option>'
-    + roomsInArea.map((r) => `<option value="${safe(r.id)}">${safe(r.name || 'Sin nombre')}</option>`).join('');
+  roomSel.innerHTML = '<option value="">Seleccione un ambiente…</option>' + roomOptionsHtml(roomsInArea, '');
   roomSel.value = roomsInArea.some((r) => r.id === prevRoom) ? prevRoom : '';
   syncCustomSelect('missing-room-select');
 }
@@ -1246,7 +1306,7 @@ function highlightAssetRows(assetIds) {
   if (assetIds.length) { currentRowAssetId = assetIds[0]; updateRowNavigator(); }
 }
 function moveRoom(direction) {
-  const rooms = visibleRooms().filter((x) => x.areaId === db.selected.areaId).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  const rooms = ordenarAmbientes(visibleRooms().filter((x) => x.areaId === db.selected.areaId).sort((a, b) => a.name.localeCompare(b.name, 'es')));
   if (!rooms.length) return;
   const index = rooms.findIndex((x) => x.id === db.selected.roomId);
   db.selected.roomId = rooms[(index + direction + rooms.length) % rooms.length].id;
@@ -1447,18 +1507,23 @@ let codeIndexCache = { n: -1, map: null };
 function codeIndex() {
   if (codeIndexCache.map && codeIndexCache.n === db.assets.length) return codeIndexCache.map;
   const map = new Map();
-  for (const a of db.assets) { if (!a.isDuplicateClone) map.set(String(a.code).replace(/\D/g, ''), a.code); }
+  for (const a of db.assets) { if (!a.isDuplicateClone) map.set(codeKey(a.code), a.code); }
   codeIndexCache = { n: db.assets.length, map };
   return map;
 }
 const digitsOf = (v) => String(v ?? '').replace(/\D/g, '');
+// Clave de comparación del código: letras Y números (sin guiones/espacios, en mayúsculas).
+// Antes la clave eran solo los dígitos, y por eso 74642559D953 y 74642559E953 daban la misma
+// clave "74642559953": al digitar uno, la app lo cambiaba por el otro. Las letras SÍ cuentan.
+const codeKey = (v) => String(v ?? '').toUpperCase().replace(/[^0-9A-Z]/g, '');
 // Formato del código patrimonial: 8 dígitos, guion y 4 dígitos (ej. 53224722-0002).
 const fmtCode = (d) => `${d.slice(0, 8)}-${d.slice(8)}`;
 // Si lo leído o digitado coincide con un código del catálogo, se usa el código tal como está en el catálogo.
 // Si son 12 dígitos que no están en el catálogo, se escriben en el formato 8-4.
 function normalizeCode(v) {
+  const k = codeKey(v);
+  if (k.length >= 8) { const hit = codeIndex().get(k); if (hit) return hit; }
   const d = digitsOf(v);
-  if (d.length >= 8) { const hit = codeIndex().get(d); if (hit) return hit; }
   if (d.length === 12 && !/[A-Za-z]/.test(String(v))) return fmtCode(d);
   return v;
 }
@@ -1575,7 +1640,7 @@ function mergeIncomingBackup(incoming) {
   incoming.rooms.forEach((oldRoom) => {
     const newAreaId = areaIdMap.get(oldRoom.areaId);
     let room = db.rooms.find((r) => r.areaId === newAreaId && header(r.name) === header(oldRoom.name));
-    if (!room) { room = { id: uid(), areaId: newAreaId, name: oldRoom.name }; db.rooms.push(room); }
+    if (!room) { room = { id: uid(), areaId: newAreaId, name: oldRoom.name, ...(oldRoom.creado ? { creado: true } : {}) }; db.rooms.push(room); }
     roomIdMap.set(oldRoom.id, room.id);
   });
 
@@ -2204,6 +2269,7 @@ function renderActaTeam() {
 // Un solo clic: genera UN PDF con el acta de TODOS los ambientes del Área (facultad) seleccionada,
 // una hoja por ambiente. Solo se piden los inventariadores; lo demás queda en blanco para llenarlo a mano.
 // - Los ambientes "FALTANTES ..." son bolsas de bienes no ubicados, no ambientes reales: NO llevan acta.
+// - Los ambientes CREADOS a mano (grupo "AMBIENTES CREADOS") tampoco llevan acta.
 // - Todas las aulas del área (nombres que empiezan con "AULA"/"AULAS") van JUNTAS en una sola acta.
 const ACTA_GRUPO_AULAS_ID = '__grupo_aulas__';
 const actaEsFaltante = (room) => /falt/i.test(String(room?.name || ''));
@@ -2212,7 +2278,7 @@ function actaRoomsOfSelectedArea() {
   const area = selectedArea();
   if (!area) return [];
   const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'es');
-  const rooms = visibleRooms().filter((r) => r.areaId === area.id && !actaEsFaltante(r));
+  const rooms = visibleRooms().filter((r) => r.areaId === area.id && !actaEsFaltante(r) && !esAmbienteCreado(r));
   const aulas = rooms.filter(actaEsAula);
   const otros = rooms.filter((r) => !actaEsAula(r)).sort(byName);
   const result = otros.map((r) => ({ id: r.id, name: r.name }));
@@ -2784,6 +2850,39 @@ $('save-button').onclick = async () => {
   setMessage('✅ Datos guardados correctamente.');
 };
 $('new-room-button').onclick = () => { editingRoomId = null; $('dialog-title').textContent = 'Nuevo ambiente'; $('room-name-input').value = ''; $('room-dialog').showModal(); };
+// Lista TODOS los ambientes creados a mano, de cualquier local/área, para poder encontrarlos y saltar a ellos.
+function openCreatedRoomsDialog() {
+  const creados = db.rooms.filter(esAmbienteCreado);
+  const list = $('created-rooms-list');
+  const lugar = (room) => {
+    const area = db.areas.find((x) => x.id === room.areaId);
+    const local = db.locals.find((x) => x.id === area?.localId);
+    return [local?.name, area?.name].filter(Boolean).join(' › ') || 'Sin área';
+  };
+  $('created-rooms-hint').textContent = creados.length
+    ? `${creados.length} ambiente(s) creado(s) a mano en este navegador. Toque uno para ir a él.`
+    : 'No hay ambientes creados a mano en este navegador. Si los creó en otro equipo, en otro navegador o abriendo la app con otra dirección (por ejemplo, el archivo index.html directo en vez de http://localhost:8000), los datos quedaron guardados allí.';
+  list.innerHTML = '';
+  creados.sort((x, y) => lugar(x).localeCompare(lugar(y), 'es') || x.name.localeCompare(y.name, 'es')).forEach((room) => {
+    const registrados = db.assets.filter((x) => x.registered && x.roomId === room.id).length;
+    const li = document.createElement('li');
+    li.innerHTML = `<span><span class="cr-name">${safe(room.name)}</span><span class="cr-path">${safe(lugar(room))} · ${registrados} bien(es) registrado(s)</span></span>`;
+    const go = document.createElement('button');
+    go.type = 'button'; go.className = 'button button-primary'; go.textContent = 'Ir';
+    go.onclick = () => {
+      const area = db.areas.find((x) => x.id === room.areaId);
+      if (roomAccess) { roomAccess.add(room.id); }
+      db.selected.localId = area?.localId; db.selected.areaId = room.areaId; db.selected.roomId = room.id;
+      $('created-rooms-dialog').close();
+      renderSelectors(); switchRoomSession();
+    };
+    li.appendChild(go);
+    list.appendChild(li);
+  });
+  $('created-rooms-dialog').showModal();
+}
+$('created-rooms-button').onclick = openCreatedRoomsDialog;
+$('created-rooms-close').onclick = () => $('created-rooms-dialog').close();
 $('edit-room-button').onclick = () => { const room = selectedRoom(); editingRoomId = room.id; $('dialog-title').textContent = 'Editar ambiente'; $('room-name-input').value = room.name; $('room-dialog').showModal(); };
 $('cancel-room').onclick = () => $('room-dialog').close();
 // Al RENOMBRAR un ambiente (editar), roomLabel() usa siempre el nombre vigente de db.rooms,
@@ -2800,6 +2899,7 @@ $('room-form').onsubmit = () => {
     const room = db.rooms.find((x) => x.id === editingRoomId);
     const oldName = room.name;
     room.name = name;
+    excelRoomCache.n = -1;   // el nombre cambió: se recalcula qué ambientes vienen del Excel
     if (header(oldName) !== header(name)) {
       const area = db.areas.find((a) => a.id === room.areaId);
       const oldRoomKey = header(oldName);
@@ -2820,7 +2920,7 @@ $('room-form').onsubmit = () => {
       }
     }
   } else {
-    const room = { id: uid(), areaId: db.selected.areaId, name };
+    const room = { id: uid(), areaId: db.selected.areaId, name, creado: true };
     db.rooms.push(room);
     if (roomAccess) roomAccess.add(room.id);
     db.selected.roomId = room.id;
