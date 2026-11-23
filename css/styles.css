@@ -645,3 +645,6 @@ tr:nth-child(1) > td > .enc-rank{background:var(--gold-soft);border-color:rgba(2
 .created-rooms-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid rgba(0,0,0,.12);border-radius:10px}
 .created-rooms-list .cr-name{font-weight:700}
 .created-rooms-list .cr-path{display:block;font-size:.8rem;opacity:.75;margin-top:2px}
+.room-heading-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-left:auto}
+.room-heading-actions .button{white-space:nowrap}
+@media (max-width:640px){.room-heading-actions{width:100%;justify-content:flex-start}.room-heading-actions .button{flex:1 1 0}}
